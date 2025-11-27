@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -76,7 +77,13 @@ async def enqueue_import(
 
         # Create import job
         try:
-            job = ImportJob(uploaded_file_path=str(staged_path))
+            # Ensure we store absolute path for consistency across processes
+            absolute_path = (
+                str(staged_path.resolve())
+                if isinstance(staged_path, Path)
+                else str(Path(staged_path).resolve())
+            )
+            job = ImportJob(uploaded_file_path=absolute_path)
             db.add(job)
             db.flush()
         except SQLAlchemyError as exc:

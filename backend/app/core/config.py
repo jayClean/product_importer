@@ -49,7 +49,11 @@ class Settings(BaseSettings):
     celery_result_url: str | None = None
 
     # Storage settings
-    uploads_dir: str = "storage/uploads"
+    uploads_dir: str = Field(
+        default="storage/uploads",
+        env="UPLOADS_DIR",
+        description="Directory for storing uploaded CSV files (absolute or relative path)",
+    )
     s3_bucket: str = "product-imports"
 
     # CORS settings - stored as string, converted to list via validator
@@ -104,6 +108,22 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql+psycopg://", 1)
         return v
+
+    @field_validator("uploads_dir", mode="after")
+    @classmethod
+    def resolve_uploads_dir(cls, v: str) -> str:
+        """Resolve uploads_dir to absolute path for consistency across processes."""
+        path = Path(v)
+        # If relative path, resolve relative to backend directory
+        if not path.is_absolute():
+            # Get backend directory (where this config file is located)
+            backend_dir = Path(__file__).parent.parent
+            path = (backend_dir / v).resolve()
+        else:
+            path = path.resolve()
+        # Ensure directory exists
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
 
     # @field_validator("allowed_hosts", mode="before")
     # @classmethod

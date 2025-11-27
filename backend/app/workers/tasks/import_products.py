@@ -21,7 +21,12 @@ def import_products_task(self, job_id: str, file_path: str):
         session.close()
         return
 
-    path_obj = Path(file_path)
+    # Resolve to absolute path to ensure consistency across processes
+    path_obj = Path(file_path).resolve()
+    if not path_obj.exists():
+        raise FileNotFoundError(
+            f"CSV file not found: {path_obj}. Current working directory: {Path.cwd()}"
+        )
     processed = 0
     inserted_total = 0
     updated_total = 0
