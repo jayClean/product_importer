@@ -205,3 +205,101 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# -------------------------
+# Node / Dependencies
+# -------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env files (keep local secrets safe)
+.env
+.env.*
+!.env.example
+
+# -------------------------
+# Vite
+# -------------------------
+dist/
+dist-ssr/
+vite.config.ts.timestamp*
+vite.config.js.timestamp*
+
+# Vite cache
+.vite/
+vite-env.d.ts
+
+# -------------------------
+# TypeScript
+# -------------------------
+*.tsbuildinfo
+
+# -------------------------
+# Testing
+# -------------------------
+coverage/
+*.lcov
+
+# -------------------------
+# Logs
+# -------------------------
+logs/
+*.log
+*.log.*
+
+# -------------------------
+# Editors / IDE
+# -------------------------
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+
+# JetBrains
+.idea/
+
+# Others
+*.swp
+*.swo
+
+# -------------------------
+# OS Files
+# -------------------------
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+*.md
+docs/
+Screening Task*.docx
