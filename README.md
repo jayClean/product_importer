@@ -203,6 +203,7 @@ Detailed guides are available in the `docs/` directory covering:
 - Infrastructure setup (Redis, Celery, local and production testing)
 - Deployment guides (backend, frontend, free tier options)
 - Memory management and OOM prevention
+- Worker OOM fix guide (for separate instances)
 - API testing and troubleshooting
 
 ## Next Steps
