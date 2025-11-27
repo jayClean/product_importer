@@ -56,6 +56,18 @@ class Settings(BaseSettings):
     )
     s3_bucket: str = "product-imports"
 
+    # Memory management settings
+    celery_memory_limit: str = Field(
+        default="800M",
+        env="CELERY_MEMORY_LIMIT",
+        description="Hard memory limit for Celery worker (e.g., '800M', '1G')",
+    )
+    celery_memory_baseline: str = Field(
+        default="500M",
+        env="CELERY_MEMORY_BASELINE",
+        description="Memory baseline threshold for pressure detection (e.g., '500M')",
+    )
+
     # CORS settings - stored as string, converted to list via validator
     cors_origins_raw: str | None = Field(
         default=None,

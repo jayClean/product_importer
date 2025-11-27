@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 from app.db.models.product import Product
 from app.storage.s3_client import save_upload
 from app.utils.csv_validator import normalize_row, validate_headers
+from app.utils.memory_monitor import (
+    check_memory_exceeded,
+    check_memory_pressure,
+    force_gc,
+    log_memory_status,
+)
 
 
 async def stage_file(upload_file: UploadFile) -> Path:
@@ -34,17 +40,54 @@ async def stage_file(upload_file: UploadFile) -> Path:
         raise ValueError(f"Failed to save file: {str(e)}") from e
 
 
-# Chunk size for CSV processing - reduced to 1000 rows for lower memory usage
-# This is optimized for Railway's free tier memory constraints
-CSV_CHUNK_SIZE = 1000
+# Chunk size for CSV processing - adaptive based on memory pressure
+# Base chunk size: 1000 rows for lower memory usage
+# Reduced to 500 when memory pressure detected, 250 when high pressure
+BASE_CHUNK_SIZE = 1000
+REDUCED_CHUNK_SIZE = 500
+MIN_CHUNK_SIZE = 250
 
-def iter_csv_chunks(file_path: Path, chunk_size: int = CSV_CHUNK_SIZE) -> Iterable[list[dict]]:
+def get_adaptive_chunk_size() -> int:
+    """Get chunk size based on current memory pressure.
+    
+    Returns:
+        Chunk size (number of rows) - smaller when memory pressure detected.
+    """
+    is_pressure, current, limit = check_memory_pressure()
+    is_exceeded, _, _ = check_memory_exceeded()
+    
+    if is_exceeded:
+        logger.warning("Memory limit exceeded, using minimum chunk size")
+        return MIN_CHUNK_SIZE
+    elif is_pressure:
+        # Check how close we are to limit
+        usage_ratio = current / limit if limit > 0 else 0
+        if usage_ratio > 0.9:  # >90% of limit
+            logger.warning("High memory pressure (>90%), using minimum chunk size")
+            return MIN_CHUNK_SIZE
+        else:
+            logger.info("Memory pressure detected, using reduced chunk size")
+            return REDUCED_CHUNK_SIZE
+    else:
+        return BASE_CHUNK_SIZE
+
+
+def iter_csv_chunks(file_path: Path, chunk_size: int | None = None) -> Iterable[list[dict]]:
     """Yield parsed CSV rows (sku, name, description) in memory-safe batches.
     
-    Processes rows in chunks of 5000 (default) to optimize database writes
-    and memory usage during large CSV imports.
+    Processes rows in adaptive chunks based on memory pressure to optimize
+    database writes and prevent OOM during large CSV imports.
+    
+    Args:
+        file_path: Path to CSV file
+        chunk_size: Optional fixed chunk size. If None, uses adaptive sizing.
     """
     try:
+        # Use adaptive chunk size if not provided
+        if chunk_size is None:
+            chunk_size = get_adaptive_chunk_size()
+            logger.info(f"Using adaptive chunk size: {chunk_size} rows")
+        
         with file_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
             if not reader.fieldnames:
@@ -57,8 +100,24 @@ def iter_csv_chunks(file_path: Path, chunk_size: int = CSV_CHUNK_SIZE) -> Iterab
 
             batch: list[dict] = []
             row_num = 1  # Start at 1 (header is row 0)
+            chunks_yielded = 0
+            
             for row in reader:
                 row_num += 1
+                
+                # Check memory before processing each row (every 100 rows for performance)
+                if row_num % 100 == 0:
+                    is_exceeded, _, _ = check_memory_exceeded()
+                    if is_exceeded:
+                        logger.error("Memory limit exceeded during CSV processing, aborting")
+                        raise MemoryError("Memory limit exceeded, cannot continue processing")
+                    
+                    # Adapt chunk size if memory pressure changes
+                    adaptive_size = get_adaptive_chunk_size()
+                    if adaptive_size < chunk_size:
+                        chunk_size = adaptive_size
+                        logger.info(f"Reduced chunk size to {chunk_size} due to memory pressure")
+                
                 try:
                     normalized = normalize_row(row)
                     batch.append(normalized)
@@ -67,9 +126,15 @@ def iter_csv_chunks(file_path: Path, chunk_size: int = CSV_CHUNK_SIZE) -> Iterab
                     # Skip invalid rows but continue processing
                     continue
 
-                if len(batch) == chunk_size:
+                if len(batch) >= chunk_size:
                     yield batch
+                    chunks_yielded += 1
                     batch = []
+                    
+                    # Force garbage collection every 10 chunks to free memory
+                    if chunks_yielded % 10 == 0:
+                        force_gc()
+                        log_memory_status(f"After {chunks_yielded} chunks")
 
             if batch:
                 yield batch

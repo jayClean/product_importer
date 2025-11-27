@@ -111,7 +111,9 @@ celery_config = {
     "worker_disable_rate_limits": False,
     "worker_hijack_root_logger": False,
     # Memory optimization settings
-    "worker_max_memory_per_child": 200000,  # 200MB per child (solo pool doesn't use this, but good to set)
+    # Note: solo pool doesn't fork, so max_memory_per_child doesn't apply
+    # Memory limits are enforced via task-level monitoring
+    "worker_max_memory_per_child": 500000,  # 500MB per child (for prefork pool if used later)
     "result_backend_always_retry": True,
     "result_backend_max_retries": 3,
     # Reduce memory usage

@@ -42,6 +42,14 @@ echo "Starting Celery worker..."
 # Set memory-efficient Python options
 export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1
+
+# Memory limits (defaults: 500MB baseline, 800MB hard limit)
+# Can be overridden via environment variables
+export CELERY_MEMORY_BASELINE="${CELERY_MEMORY_BASELINE:-500M}"
+export CELERY_MEMORY_LIMIT="${CELERY_MEMORY_LIMIT:-800M}"
+
+echo "Memory limits: baseline=${CELERY_MEMORY_BASELINE}, limit=${CELERY_MEMORY_LIMIT}"
+
 PYTHONWARNINGS="ignore::UserWarning:celery.platforms" \
 celery -A app.workers.celery_app.celery_app worker \
     --loglevel=warning \

@@ -160,6 +160,8 @@ The application uses a **monolithic service approach** where both the FastAPI AP
 - `UPLOADS_DIR`: Optional (defaults to `backend/storage/uploads`)
 - `LOG_LEVEL`: Logging level (default: INFO)
 - `CORS_ORIGINS`: Comma-separated list of allowed frontend origins
+- `CELERY_MEMORY_BASELINE`: Memory warning threshold (default: `500M`)
+- `CELERY_MEMORY_LIMIT`: Hard memory limit (default: `800M`)
 
 **Frontend (Vercel)**:
 - `VITE_API_BASE_URL`: Backend API URL (e.g., `https://your-api.railway.app`)
@@ -200,6 +202,7 @@ Detailed guides are available in the `docs/` directory covering:
 - Core features (upload flow, product management, webhooks, SSE)
 - Infrastructure setup (Redis, Celery, local and production testing)
 - Deployment guides (backend, frontend, free tier options)
+- Memory management and OOM prevention
 - API testing and troubleshooting
 
 ## Next Steps
