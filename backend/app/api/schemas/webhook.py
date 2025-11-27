@@ -1,6 +1,8 @@
 """Webhook configuration schemas."""
 
-from pydantic import BaseModel, AnyHttpUrl, Field
+from datetime import datetime
+
+from pydantic import BaseModel, AnyHttpUrl, Field, field_serializer
 
 
 class WebhookBase(BaseModel):
@@ -25,6 +27,13 @@ class WebhookRead(WebhookBase):
     secret: str | None = None
     last_test_status: str | None = None
     last_test_response_ms: int | None = None
-    created_at: str | None = None
+    created_at: datetime | None = None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        """Convert datetime to ISO format string."""
+        if value is None:
+            return None
+        return value.isoformat()
 
     model_config = {"from_attributes": True}
