@@ -14,7 +14,8 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
     if (params) {
       const searchParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        // Filter out undefined, null, and empty strings
+        if (value !== undefined && value !== null && value !== '') {
           searchParams.append(key, String(value));
         }
       });
@@ -27,10 +28,16 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
   }
   
   // Use absolute URL when API_BASE_URL is explicitly set
-  const url = new URL(path, API_BASE_URL);
+  // Ensure API_BASE_URL doesn't have trailing slash
+  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  // Ensure path starts with /
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(normalizedPath, baseUrl);
+  
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
+      // Filter out undefined, null, and empty strings
+      if (value !== undefined && value !== null && value !== '') {
         url.searchParams.append(key, String(value));
       }
     });
