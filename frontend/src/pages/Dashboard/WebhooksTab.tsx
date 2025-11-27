@@ -58,17 +58,21 @@ export const WebhooksTab = () => {
       {isLoading && <p>Loading webhooks...</p>}
       {error && <p className="error">Error loading webhooks: {(error as Error).message}</p>}
 
-      {webhooks && (
+      {webhooks && webhooks.length > 0 && (
         <WebhookList
           webhooks={webhooks}
           onEdit={handleEdit}
-          onDelete={(id) => {
+          onDelete={() => {
             queryClient.invalidateQueries({ queryKey: ['webhooks'] });
             setToasts([{ id: Date.now(), message: 'Webhook deleted', type: 'success' }]);
           }}
           onTest={handleTest}
           isTesting={testMutation.isPending}
         />
+      )}
+
+      {webhooks && webhooks.length === 0 && (
+        <p className="empty-state">No webhooks found</p>
       )}
 
       {showForm && (

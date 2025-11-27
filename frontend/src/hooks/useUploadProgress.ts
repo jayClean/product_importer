@@ -3,7 +3,7 @@ import { fetchUploadStatus } from '../api/uploads';
 
 export const useUploadProgress = (jobId: string | null) => {
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [status, setStatus] = useState<'idle' | 'pending' | 'running' | 'processing' | 'completed' | 'failed'>('idle');
   const [message, setMessage] = useState<string>('');
 
   useEffect(() => {

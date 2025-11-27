@@ -75,7 +75,7 @@ export const JobsTab = () => {
 
       {jobs && jobs.length > 0 && (
         <div className="jobs-list">
-          {jobs.map((job: any) => (
+          {jobs.map((job) => (
             <div key={job.id} className="job-card">
               <div className="job-header">
                 <div>
@@ -93,7 +93,7 @@ export const JobsTab = () => {
                   <ProgressIndicator
                     progress={(job.progress || 0) * 100}
                     status={job.status}
-                    message={job.message}
+                    message={job.message || undefined}
                   />
                 </div>
               ) : null}
@@ -109,7 +109,7 @@ export const JobsTab = () => {
                     <span className="detail-value">{job.total_rows.toLocaleString()}</span>
                   </div>
                 )}
-                {job.processed_rows !== undefined && (
+                {job.processed_rows !== undefined && job.processed_rows !== null && (
                   <div className="job-detail-row">
                     <span className="detail-label">Processed:</span>
                     <span className="detail-value">{job.processed_rows.toLocaleString()}</span>

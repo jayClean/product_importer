@@ -6,9 +6,9 @@ interface Webhook {
   url: string;
   event: string;
   enabled: boolean;
-  last_test_status?: number | null;
+  last_test_status?: string | null;
   last_test_response_ms?: number | null;
-  created_at: string;
+  created_at?: string | null;
 }
 
 interface WebhookListProps {
@@ -55,7 +55,7 @@ export const WebhookList = ({ webhooks, onEdit, onDelete, onTest, isTesting }: W
             {webhook.last_test_status && (
               <p>
                 <strong>Last Test:</strong>{' '}
-                <span className={webhook.last_test_status === 200 ? 'success' : 'error'}>
+                <span className={webhook.last_test_status === '200' ? 'success' : 'error'}>
                   {webhook.last_test_status} ({webhook.last_test_response_ms}ms)
                 </span>
               </p>

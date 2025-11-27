@@ -5,10 +5,10 @@ interface Product {
   id: number;
   sku: string;
   name: string;
-  description: string;
+  description: string | null;
   active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ProductTableProps {
