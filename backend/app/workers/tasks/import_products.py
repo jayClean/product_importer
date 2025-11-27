@@ -26,12 +26,50 @@ from app.workers.celery_app import celery_app
 def import_products_task(self, job_id: str, file_path: str):
     """Process CSV chunks, upsert rows, and update progress tracker."""
     import logging
+    from sqlalchemy.exc import OperationalError, DisconnectionError
 
     logger = logging.getLogger(__name__)
-    session = SessionLocal()
-    job: ImportJob | None = session.get(ImportJob, job_id)
+
+    # Get fresh session with retry logic
+    from app.db.session import get_fresh_session
+
+    session = get_fresh_session()
+
+    # Helper to refresh session if connection is lost
+    def refresh_session_if_needed():
+        nonlocal session
+        from sqlalchemy import text
+
+        try:
+            # Test connection
+            session.execute(text("SELECT 1"))
+            session.commit()
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning(f"Connection lost, refreshing session: {e}")
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            session.close()
+            session = get_fresh_session()
+            # Re-fetch job after reconnecting
+            nonlocal job
+            job = session.get(ImportJob, job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found after reconnection")
+
+    job: ImportJob | None = None
+    try:
+        job = session.get(ImportJob, job_id)
+    except (OperationalError, DisconnectionError) as e:
+        logger.warning(f"Connection error fetching job: {e}, retrying...")
+        session.close()
+        session = get_fresh_session()
+        job = session.get(ImportJob, job_id)
+
     if not job:
         session.close()
+        logger.error(f"Job {job_id} not found")
         return
 
     # Handle file retrieval for separate instances
@@ -80,13 +118,36 @@ def import_products_task(self, job_id: str, file_path: str):
         # Log initial memory status
         log_memory_status("Task start")
 
+        # Refresh session before starting to ensure fresh connection
+        try:
+            refresh_session_if_needed()
+        except Exception as e:
+            logger.warning(f"Error refreshing session at start: {e}")
+
         job.status = "running"
         job.started_at = datetime.now(timezone.utc)
-        session.commit()
+        try:
+            session.commit()
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning(
+                f"Connection error committing start status: {e}, refreshing..."
+            )
+            refresh_session_if_needed()
+            job.status = "running"
+            job.started_at = datetime.now(timezone.utc)
+            session.commit()
 
         total_rows = csv_ingest.count_rows(path_obj)
         job.total_rows = total_rows
-        session.commit()
+        try:
+            session.commit()
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning(
+                f"Connection error committing total_rows: {e}, refreshing..."
+            )
+            refresh_session_if_needed()
+            job.total_rows = total_rows
+            session.commit()
 
         log_memory_status(f"After counting {total_rows} rows")
 
@@ -102,13 +163,33 @@ def import_products_task(self, job_id: str, file_path: str):
                 logger.error(error_msg)
                 raise MemoryError(error_msg)
 
+            # Refresh session every 10 chunks to prevent connection timeout
+            if chunk_count > 0 and chunk_count % 10 == 0:
+                try:
+                    refresh_session_if_needed()
+                except Exception as e:
+                    logger.warning(f"Error refreshing session: {e}, continuing...")
+
             # Process chunk
-            stats = csv_ingest.upsert_products(chunk, session)
-            inserted_total += stats["inserted"]
-            updated_total += stats["updated"]
-            processed += len(chunk)
-            job.processed_rows = processed
-            session.commit()
+            try:
+                stats = csv_ingest.upsert_products(chunk, session)
+                inserted_total += stats["inserted"]
+                updated_total += stats["updated"]
+                processed += len(chunk)
+                job.processed_rows = processed
+                session.commit()
+            except (OperationalError, DisconnectionError) as e:
+                logger.warning(
+                    f"Connection error during chunk processing: {e}, refreshing session..."
+                )
+                refresh_session_if_needed()
+                # Retry the chunk
+                stats = csv_ingest.upsert_products(chunk, session)
+                inserted_total += stats["inserted"]
+                updated_total += stats["updated"]
+                processed += len(chunk)
+                job.processed_rows = processed
+                session.commit()
 
             chunk_count += 1
 
@@ -131,9 +212,24 @@ def import_products_task(self, job_id: str, file_path: str):
                 },
             )
 
+        # Refresh session before final commit
+        try:
+            refresh_session_if_needed()
+        except Exception as e:
+            logger.warning(f"Error refreshing session before completion: {e}")
+
         job.status = "completed"
         job.finished_at = datetime.now(timezone.utc)
-        session.commit()
+        try:
+            session.commit()
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning(
+                f"Connection error committing completion: {e}, refreshing..."
+            )
+            refresh_session_if_needed()
+            job.status = "completed"
+            job.finished_at = datetime.now(timezone.utc)
+            session.commit()
 
         # Final garbage collection and memory log
         force_gc()
