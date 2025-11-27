@@ -72,12 +72,24 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Parse CORS_ORIGINS from comma-separated string to list."""
         if self.cors_origins_raw is None or not self.cors_origins_raw.strip():
-            return ["http://localhost:5173", "http://localhost:3000"]
+            return [
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "https://product-importer-three.vercel.app/",
+            ]
         origins = [
-            origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()
+            origin.strip()
+            for origin in self.cors_origins_raw.split(",")
+            if origin.strip()
         ]
         return (
-            origins if origins else ["http://localhost:5173", "http://localhost:3000"]
+            origins
+            if origins
+            else [
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "https://product-importer-three.vercel.app/",
+            ]
         )
 
     @field_validator("database_url", mode="before")
