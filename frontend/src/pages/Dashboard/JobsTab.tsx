@@ -88,15 +88,15 @@ export const JobsTab = () => {
                 </div>
               </div>
 
-              {job.status === 'running' || job.status === 'pending' ? (
+              {(job.status === 'running' || job.status === 'pending' || job.status === 'completed' || job.status === 'failed') && (
                 <div className="job-progress">
                   <ProgressIndicator
-                    progress={(job.progress || 0) * 100}
-                    status={job.status}
+                    progress={typeof job.progress === 'number' ? Math.round(job.progress * 100) : 0}
+                    status={job.status === 'running' ? 'processing' : job.status}
                     message={job.message || undefined}
                   />
                 </div>
-              ) : null}
+              )}
 
               <div className="job-details">
                 <div className="job-detail-row">

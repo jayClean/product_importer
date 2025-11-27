@@ -12,11 +12,15 @@ export const ProgressIndicator = ({ progress, status, message }: ProgressIndicat
       case 'failed':
         return '#ef4444';
       case 'processing':
+      case 'running':
         return '#3b82f6';
       default:
         return '#6b7280';
     }
   };
+
+  // Clamp progress to 0-100
+  const clampedProgress = Math.max(0, Math.min(100, progress));
 
   return (
     <div className="progress-indicator">
@@ -24,13 +28,13 @@ export const ProgressIndicator = ({ progress, status, message }: ProgressIndicat
         <span className="progress-status" style={{ color: getStatusColor() }}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </span>
-        <span className="progress-percentage">{Math.round(progress)}%</span>
+        <span className="progress-percentage">{Math.round(clampedProgress)}%</span>
       </div>
       <div className="progress-bar-container">
         <div
           className="progress-bar"
           style={{
-            width: `${progress}%`,
+            width: `${clampedProgress}%`,
             backgroundColor: getStatusColor(),
           }}
         />

@@ -67,11 +67,18 @@ export const apiClient = {
     console.log('[API Client] Fetching URL:', url);
     
     try {
+      // Add timeout to prevent blocking (10 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch(url, {
         method: 'GET',
         redirect: 'follow', // Let browser handle redirects
+        signal: controller.signal,
         // Don't set Content-Type for GET requests - it triggers unnecessary CORS preflight
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('[API Client] Response status:', response.status, 'URL:', url);
 
@@ -87,6 +94,10 @@ export const apiClient = {
       console.log('[API Client] Success:', url);
       return data;
     } catch (error) {
+      // Handle abort/timeout
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout: ${url} took longer than 10 seconds`);
+      }
       // Provide more detailed error information
       console.error('[API Client] Error details:', {
         error,

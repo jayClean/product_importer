@@ -29,10 +29,18 @@ export const UploadWizard = () => {
     if (file) {
       if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
         setToasts([{ id: Date.now(), message: 'Please select a CSV file', type: 'error' }]);
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         return;
       }
       setSelectedFile(file);
       setJobId(null);
+      // Auto-upload after file selection
+      setTimeout(() => {
+        uploadMutation.mutate(file);
+      }, 100);
     }
   };
 
@@ -46,6 +54,10 @@ export const UploadWizard = () => {
       }
       setSelectedFile(file);
       setJobId(null);
+      // Auto-upload after file drop
+      setTimeout(() => {
+        uploadMutation.mutate(file);
+      }, 100);
     }
   };
 
@@ -75,7 +87,12 @@ export const UploadWizard = () => {
           className="upload-area"
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            // Only open file picker if no file is selected
+            if (!selectedFile) {
+              fileInputRef.current?.click();
+            }
+          }}
         >
           <input
             ref={fileInputRef}
@@ -88,14 +105,18 @@ export const UploadWizard = () => {
             <div className="file-selected">
               <p>Selected: <strong>{selectedFile.name}</strong></p>
               <p className="file-size">{(selectedFile.size / 1024).toFixed(2)} KB</p>
-              <div className="upload-actions">
-                <button onClick={handleUpload} disabled={uploadMutation.isPending}>
-                  {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
-                </button>
-                <button onClick={handleReset} className="secondary">
-                  Choose Different File
-                </button>
-              </div>
+              {uploadMutation.isPending ? (
+                <p className="upload-status">Uploading...</p>
+              ) : (
+                <div className="upload-actions">
+                  <button onClick={handleUpload} disabled={uploadMutation.isPending}>
+                    Upload
+                  </button>
+                  <button onClick={handleReset} className="secondary">
+                    Choose Different File
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="upload-prompt">

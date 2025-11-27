@@ -1,10 +1,30 @@
-import { useState, useEffect } from 'react';
-import { fetchUploadStatus } from '../api/uploads';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchJob } from '../api/jobs';
 
 export const useUploadProgress = (jobId: string | null) => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<'idle' | 'pending' | 'running' | 'processing' | 'completed' | 'failed'>('idle');
   const [message, setMessage] = useState<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Use React Query for better state management and caching
+  const { data, error, isFetching } = useQuery({
+    queryKey: ['job', jobId],
+    queryFn: () => fetchJob(jobId!),
+    enabled: !!jobId,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      // Stop polling if completed or failed
+      if (data?.status === 'completed' || data?.status === 'failed') {
+        return false;
+      }
+      // Poll every 2 seconds for active jobs
+      return 2000;
+    },
+    retry: 3,
+    retryDelay: 1000,
+  });
 
   useEffect(() => {
     if (!jobId) {
@@ -14,31 +34,28 @@ export const useUploadProgress = (jobId: string | null) => {
       return;
     }
 
-    setStatus('pending');
-    setMessage('Starting upload...');
+    // Update state from query data
+    if (data) {
+      // Progress is 0-1 from API, convert to 0-100 for display
+      const progressValue = typeof data.progress === 'number' 
+        ? Math.round(data.progress * 100) 
+        : 0;
+      setProgress(progressValue);
+      
+      // Map backend status to frontend status
+      const mappedStatus = data.status === 'running' ? 'processing' : data.status;
+      setStatus(mappedStatus as any);
+      
+      setMessage(data.message || '');
+    } else if (error) {
+      setStatus('failed');
+      setMessage('Failed to fetch progress');
+    } else {
+      // Initial state while loading
+      setStatus('pending');
+      setMessage('Starting upload...');
+    }
+  }, [data, error, jobId]);
 
-    // Polling interval
-    const interval = setInterval(async () => {
-      try {
-        const data = await fetchUploadStatus(jobId);
-        setProgress(data.progress || 0);
-        setStatus(data.status || 'pending');
-        setMessage(data.message || '');
-
-        // Stop polling if completed or failed
-        if (data.status === 'completed' || data.status === 'failed') {
-          clearInterval(interval);
-        }
-      } catch (error) {
-        console.error('Error fetching progress:', error);
-        setStatus('failed');
-        setMessage('Failed to fetch progress');
-        clearInterval(interval);
-      }
-    }, 2000); // Poll every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [jobId]);
-
-  return { progress, status, message };
+  return { progress, status, message, isFetching };
 };
