@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchJob } from '../api/jobs';
 
@@ -6,7 +6,6 @@ export const useUploadProgress = (jobId: string | null) => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<'idle' | 'pending' | 'running' | 'processing' | 'completed' | 'failed'>('idle');
   const [message, setMessage] = useState<string>('');
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Use React Query for better state management and caching
   const { data, error, isFetching } = useQuery({
