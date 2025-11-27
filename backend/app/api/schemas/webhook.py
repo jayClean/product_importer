@@ -1,0 +1,30 @@
+"""Webhook configuration schemas."""
+
+from pydantic import BaseModel, AnyHttpUrl, Field
+
+
+class WebhookBase(BaseModel):
+    url: AnyHttpUrl
+    event: str = Field(..., description="Event type to subscribe to")
+    enabled: bool = True
+
+
+class WebhookCreate(WebhookBase):
+    secret: str | None = Field(None, description="Optional signing secret")
+
+
+class WebhookUpdate(BaseModel):
+    url: AnyHttpUrl | None = None
+    event: str | None = None
+    enabled: bool | None = None
+    secret: str | None = None
+
+
+class WebhookRead(WebhookBase):
+    id: int
+    secret: str | None = None
+    last_test_status: str | None = None
+    last_test_response_ms: int | None = None
+    created_at: str | None = None
+
+    model_config = {"from_attributes": True}
