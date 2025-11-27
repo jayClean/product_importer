@@ -32,17 +32,20 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
   const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   // Ensure path starts with /
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const url = new URL(normalizedPath, baseUrl);
   
+  // Build query string manually to avoid URL constructor issues
+  const queryParts: string[] = [];
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       // Filter out undefined, null, and empty strings
       if (value !== undefined && value !== null && value !== '') {
-        url.searchParams.append(key, String(value));
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
       }
     });
   }
-  return url.toString();
+  
+  const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  return `${baseUrl}${normalizedPath}${queryString}`;
 }
 
 /**
@@ -51,13 +54,22 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
 export const apiClient = {
   get: async <T>(path: string, params?: Record<string, unknown>): Promise<T> => {
     const url = buildUrl(path, params);
+    
+    // Debug: log the URL being requested (remove in production if needed)
+    if (import.meta.env.DEV) {
+      console.log('Fetching URL:', url);
+    }
+    
     const response = await fetch(url, {
       method: 'GET',
+      redirect: 'follow', // Explicitly follow redirects
       // Don't set Content-Type for GET requests - it triggers unnecessary CORS preflight
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Log more details about the error
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      throw new Error(`HTTP error! status: ${response.status}, url: ${url}, response: ${errorText}`);
     }
 
     return response.json();
