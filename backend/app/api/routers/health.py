@@ -28,6 +28,17 @@ async def live() -> dict[str, str]:
     return {"status": "ok", "service": "product-importer-api"}
 
 
+@router.get("/cors-config", summary="CORS configuration debug endpoint")
+async def cors_config() -> dict[str, Any]:
+    """Debug endpoint to check CORS configuration."""
+    settings = get_settings()
+    return {
+        "cors_origins_raw": settings.cors_origins_raw,
+        "cors_origins_parsed": settings.cors_origins,
+        "note": "Set CORS_ORIGINS environment variable on Render to allow your frontend origin",
+    }
+
+
 @router.get("/ready", summary="Readiness probe")
 async def ready() -> dict[str, Any]:
     """Check readiness of dependencies (database, Redis, Celery).

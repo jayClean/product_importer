@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class CORSDebugMiddleware(BaseHTTPMiddleware):
     """Middleware to log CORS-related headers for debugging."""
+
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("Origin")
         if origin:
@@ -25,13 +26,18 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     """Instantiate the FastAPI app and include top-level routers."""
     app = FastAPI(title="Acme Product Importer", version="0.1.0")
-    
+
     settings = get_settings()
-    
-    # Debug: Log CORS origins being used
+
+    # Debug: Log CORS origins being used - do this at startup
     cors_origins = settings.cors_origins
-    logger.info(f"[CORS] Allowed origins: {cors_origins}")
-    print(f"[CORS] Allowed origins: {cors_origins}")  # Also print to stdout for Render logs
+    cors_origins_raw = settings.cors_origins_raw
+    logger.info(f"[CORS] Environment variable CORS_ORIGINS: {cors_origins_raw}")
+    logger.info(f"[CORS] Parsed allowed origins: {cors_origins}")
+    print(f"========================================")
+    print(f"[CORS CONFIG] Environment CORS_ORIGINS: {cors_origins_raw}")
+    print(f"[CORS CONFIG] Parsed allowed origins: {cors_origins}")
+    print(f"========================================")
 
     # Add CORS debug middleware to log incoming origins
     app.add_middleware(CORSDebugMiddleware)
