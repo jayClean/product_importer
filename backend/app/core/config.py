@@ -72,9 +72,12 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Parse CORS_ORIGINS from comma-separated string to list."""
         if self.cors_origins_raw is None or not self.cors_origins_raw.strip():
+            # Default origins for local development
+            # Include Vercel frontend for testing deployed frontend against localhost backend
             return [
                 "http://localhost:5173",
                 "http://localhost:3000",
+                "https://product-importer-three.vercel.app",
             ]
         origins = [
             origin.strip().rstrip("/")  # Remove trailing slashes
@@ -87,6 +90,7 @@ class Settings(BaseSettings):
             else [
                 "http://localhost:5173",
                 "http://localhost:3000",
+                "https://product-importer-three.vercel.app",
             ]
         )
 

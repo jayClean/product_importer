@@ -20,6 +20,24 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
             logger.info(f"[CORS Debug] Request Origin: {origin}")
             print(f"[CORS Debug] Request Origin: {origin}")
         response = await call_next(request)
+        # Log CORS headers in response
+        access_control_allow_origin = response.headers.get(
+            "Access-Control-Allow-Origin"
+        )
+        if access_control_allow_origin:
+            logger.info(
+                f"[CORS Debug] Response Access-Control-Allow-Origin: {access_control_allow_origin}"
+            )
+            print(
+                f"[CORS Debug] Response Access-Control-Allow-Origin: {access_control_allow_origin}"
+            )
+        else:
+            logger.warning(
+                f"[CORS Debug] No Access-Control-Allow-Origin header in response!"
+            )
+            print(
+                f"[CORS Debug] WARNING: No Access-Control-Allow-Origin header in response!"
+            )
         return response
 
 
