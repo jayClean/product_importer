@@ -32,13 +32,12 @@ function buildUrl(path: string, params?: Record<string, unknown>): string {
   const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   // Ensure path starts with /
   let normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  // FastAPI routes with prefix and "/" route definition need trailing slash
-  // e.g., prefix="/api/products" + route="/" = /api/products/
-  // Add trailing slash for collection endpoints to avoid 307 redirects
-  // Only add if path doesn't already end with / and doesn't have a resource ID (like /api/products/123)
-  if (!normalizedPath.endsWith('/') && 
-      !normalizedPath.match(/\/\d+(\/|$)/) && // Don't add for resource IDs
-      !normalizedPath.includes('?')) {
+  // FastAPI routes with prefix="/api/products" and route="/" need trailing slash: /api/products/
+  // Add trailing slash for collection list endpoints to avoid 307 redirects
+  // Check if this is a collection endpoint (ends with /api/products, /api/jobs, /api/webhooks, etc.)
+  const isCollectionEndpoint = /^\/api\/(products|jobs|webhooks|uploads)(\/.*)?$/.test(normalizedPath);
+  if (isCollectionEndpoint && !normalizedPath.endsWith('/') && !normalizedPath.match(/\/\d+/)) {
+    // Add trailing slash for collection endpoints without resource IDs
     normalizedPath = `${normalizedPath}/`;
   }
   
@@ -64,13 +63,9 @@ export const apiClient = {
   get: async <T>(path: string, params?: Record<string, unknown>): Promise<T> => {
     const url = buildUrl(path, params);
     
-    // Debug: log the URL being requested (remove in production if needed)
-    if (import.meta.env.DEV) {
-      console.log('Fetching URL:', url);
-    }
+    // Debug: log the URL being requested (always log for debugging)
+    console.log('[API Client] Fetching URL:', url);
     
-    // Try with redirect: 'follow' first - if it fails due to CORS on redirect,
-    // the browser will block it and we'll get an error we can handle
     try {
       const response = await fetch(url, {
         method: 'GET',
@@ -78,23 +73,45 @@ export const apiClient = {
         // Don't set Content-Type for GET requests - it triggers unnecessary CORS preflight
       });
 
+      console.log('[API Client] Response status:', response.status, 'URL:', url);
+
       if (!response.ok) {
         // Log more details about the error
         const errorText = await response.text().catch(() => 'Unable to read error response');
-        throw new Error(`HTTP error! status: ${response.status}, url: ${url}, response: ${errorText}`);
+        const errorMessage = `HTTP error! status: ${response.status}, url: ${url}`;
+        console.error('[API Client]', errorMessage, errorText);
+        throw new Error(errorMessage);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('[API Client] Success:', url);
+      return data;
     } catch (error) {
-      // If fetch fails due to CORS on redirect, try without redirect following
-      // This might work if the initial URL is correct
-      if (error instanceof TypeError && error.message.includes('CORS')) {
-        console.warn('CORS error on redirect, retrying with manual redirect handling');
-        // Unfortunately, we can't manually handle redirects due to CORS restrictions
-        // The backend needs to not redirect, or the redirect response needs CORS headers
-        throw new Error(`CORS error: The server is redirecting but the redirect response lacks CORS headers. Please ensure the URL is correct and doesn't cause a redirect. URL: ${url}`);
+      // Provide more detailed error information
+      console.error('[API Client] Error details:', {
+        error,
+        url,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      
+      if (error instanceof TypeError) {
+        // Network error or CORS error
+        if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
+          const errorMessage = `Network error: Unable to fetch ${url}. Check CORS configuration and network connectivity.`;
+          throw new Error(errorMessage);
+        }
+        if (error.message.includes('CORS')) {
+          const errorMessage = `CORS error: Request to ${url} was blocked. Check backend CORS_ORIGINS configuration.`;
+          throw new Error(errorMessage);
+        }
       }
-      throw error;
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Unknown error fetching ${url}: ${String(error)}`);
     }
   },
 
