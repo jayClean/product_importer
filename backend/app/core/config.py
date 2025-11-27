@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     uploads_dir: str = "storage/uploads"
     s3_bucket: str = "product-imports"
 
+    # CORS settings
+    cors_origins: List[str] = Field(
+        default=["http://localhost:5173", "http://localhost:3000"],
+        env="CORS_ORIGINS",
+        description="Comma-separated list of allowed CORS origins",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -96,6 +103,24 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql+psycopg://", 1)
         return v
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: str | List[str] | None) -> List[str]:
+        """Parse CORS_ORIGINS from comma-separated string or list."""
+        if v is None:
+            return ["http://localhost:5173", "http://localhost:3000"]
+        if isinstance(v, str):
+            # Split by comma and strip whitespace
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            return (
+                origins
+                if origins
+                else ["http://localhost:5173", "http://localhost:3000"]
+            )
+        if isinstance(v, list):
+            return v if v else ["http://localhost:5173", "http://localhost:3000"]
+        return ["http://localhost:5173", "http://localhost:3000"]
 
     # @field_validator("allowed_hosts", mode="before")
     # @classmethod

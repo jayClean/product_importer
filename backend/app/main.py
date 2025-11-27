@@ -4,21 +4,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import uploads, products, webhooks, jobs, health
+from app.core.config import get_settings
 
 
 def create_app() -> FastAPI:
     """Instantiate the FastAPI app and include top-level routers."""
     app = FastAPI(title="Acme Product Importer", version="0.1.0")
 
+    settings = get_settings()
+
     # Configure CORS for frontend
+    # Allow origins from environment variable CORS_ORIGINS (comma-separated)
+    # Defaults to localhost for development
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",  # Vite dev server
-            "http://localhost:3000",  # Alternative dev port
-            # Add production frontend URL when deployed
-            # "https://your-frontend-domain.com",
-        ],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
