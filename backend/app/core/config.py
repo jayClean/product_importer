@@ -67,31 +67,34 @@ class Settings(BaseSettings):
         populate_by_name=True,  # Allow both field name and alias
     )
 
-    # @model_validator(mode="before")
-    # @classmethod
-    # def parse_allowed_hosts_before(cls, data: dict | list | None) -> dict | list | None:
-    #     """Parse ALLOWED_HOSTS from comma-separated string before JSON parsing."""
-    #     if isinstance(data, dict):
-    #         # Check both uppercase and lowercase keys (case_sensitive=False)
-    #         for key in ["ALLOWED_HOSTS", "allowed_hosts"]:
-    #             if key in data:
-    #                 value = data[key]
-    #                 if isinstance(value, str):
-    #                     if value.strip():
-    #                         # Convert comma-separated string to list
-    #                         data[key] = [
-    #                             host.strip()
-    #                             for host in value.split(",")
-    #                             if host.strip()
-    #                         ]
-    #                     else:
-    #                         # Empty string -> default
-    #                         data[key] = ["*"]
-    #                 elif value is None:
-    #                     data[key] = ["*"]
-    #                 # If it's already a list, leave it as is
-    #                 break
-    # return data
+    @model_validator(mode="before")
+    @classmethod
+    def parse_cors_origins_before(cls, data: dict | list | None) -> dict | list | None:
+        """Parse CORS_ORIGINS from comma-separated string before JSON parsing."""
+        if isinstance(data, dict):
+            # Check both uppercase and lowercase keys (case_sensitive=False)
+            for key in ["CORS_ORIGINS", "cors_origins"]:
+                if key in data:
+                    value = data[key]
+                    if isinstance(value, str):
+                        if value.strip():
+                            # Convert comma-separated string to list
+                            data[key] = [
+                                origin.strip()
+                                for origin in value.split(",")
+                                if origin.strip()
+                            ]
+                        else:
+                            # Empty string -> default
+                            data[key] = [
+                                "http://localhost:5173",
+                                "http://localhost:3000",
+                            ]
+                    elif value is None:
+                        data[key] = ["http://localhost:5173", "http://localhost:3000"]
+                    # If it's already a list, leave it as is
+                    break
+        return data
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -103,24 +106,6 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql+psycopg://", 1)
         return v
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | List[str] | None) -> List[str]:
-        """Parse CORS_ORIGINS from comma-separated string or list."""
-        if v is None:
-            return ["http://localhost:5173", "http://localhost:3000"]
-        if isinstance(v, str):
-            # Split by comma and strip whitespace
-            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-            return (
-                origins
-                if origins
-                else ["http://localhost:5173", "http://localhost:3000"]
-            )
-        if isinstance(v, list):
-            return v if v else ["http://localhost:5173", "http://localhost:3000"]
-        return ["http://localhost:5173", "http://localhost:3000"]
 
     # @field_validator("allowed_hosts", mode="before")
     # @classmethod
