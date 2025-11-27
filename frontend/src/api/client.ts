@@ -46,9 +46,7 @@ export const apiClient = {
     const url = buildUrl(path, params);
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      // Don't set Content-Type for GET requests - it triggers unnecessary CORS preflight
     });
 
     if (!response.ok) {

@@ -75,10 +75,9 @@ class Settings(BaseSettings):
             return [
                 "http://localhost:5173",
                 "http://localhost:3000",
-                "https://product-importer-three.vercel.app/",
             ]
         origins = [
-            origin.strip()
+            origin.strip().rstrip("/")  # Remove trailing slashes
             for origin in self.cors_origins_raw.split(",")
             if origin.strip()
         ]
@@ -88,7 +87,6 @@ class Settings(BaseSettings):
             else [
                 "http://localhost:5173",
                 "http://localhost:3000",
-                "https://product-importer-three.vercel.app/",
             ]
         )
 
