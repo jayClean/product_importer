@@ -36,6 +36,9 @@ trap cleanup SIGTERM SIGINT
 # --without-mingle and --without-gossip avoid superuser privilege warnings
 # Solo pool is single-threaded, perfect for Railway's resource constraints
 echo "Starting Celery worker..."
+# Suppress superuser warning using Python's warning filter
+# Railway containers run as root, which is safe in containerized environments
+PYTHONWARNINGS="ignore::UserWarning:celery.platforms" \
 celery -A app.workers.celery_app.celery_app worker \
     --loglevel=info \
     --queues=imports,webhooks,celery \
@@ -47,14 +50,34 @@ celery -A app.workers.celery_app.celery_app worker \
     --logfile=/tmp/celery.log
 
 # Wait a moment to ensure Celery started
-sleep 2
+sleep 3
 
 # Check if Celery is running
-if [ -f /tmp/celery.pid ] && kill -0 $(cat /tmp/celery.pid) 2>/dev/null; then
-    echo "Celery worker started successfully (PID: $(cat /tmp/celery.pid))"
+if [ -f /tmp/celery.pid ]; then
+    CELERY_PID=$(cat /tmp/celery.pid)
+    if kill -0 "$CELERY_PID" 2>/dev/null; then
+        echo "✓ Celery worker started successfully (PID: $CELERY_PID)"
+    else
+        echo "✗ Celery worker process not running. PID file exists but process is dead."
+        echo "Last 30 lines of Celery log:"
+        tail -30 /tmp/celery.log 2>/dev/null || echo "No log file found"
+        echo "Attempting to start Celery without detach to see errors..."
+        # Try starting without detach to see what's wrong (will run in background via &)
+        PYTHONWARNINGS="ignore::UserWarning:celery.platforms" \
+        celery -A app.workers.celery_app.celery_app worker \
+            --loglevel=info \
+            --queues=imports,webhooks,celery \
+            --pool=solo \
+            --without-mingle \
+            --without-gossip \
+            --logfile=/tmp/celery.log &
+        echo $! > /tmp/celery.pid
+        sleep 2
+    fi
 else
-    echo "WARNING: Celery worker may not have started correctly. Check logs:"
-    tail -20 /tmp/celery.log 2>/dev/null || echo "No log file found"
+    echo "✗ Celery PID file not found. Worker may have failed to start."
+    echo "Checking for any Celery processes..."
+    ps aux | grep celery | grep -v grep || echo "No Celery processes found"
 fi
 
 # Start FastAPI server (foreground - this keeps the service alive)

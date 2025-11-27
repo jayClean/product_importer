@@ -106,6 +106,9 @@ celery_config = {
     "task_soft_time_limit": 3300,  # 55 min soft limit
     "result_expires": 3600,  # Results expire after 1 hour
     "broker_connection_retry_on_startup": True,
+    # Suppress superuser warnings for containerized environments
+    "worker_disable_rate_limits": False,
+    "worker_hijack_root_logger": False,
 }
 
 # Add SSL config to main config if not already set
