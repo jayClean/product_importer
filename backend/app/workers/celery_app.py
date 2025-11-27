@@ -83,11 +83,13 @@ celery_app.autodiscover_tasks(["app.workers.tasks"])
 # Explicitly import tasks to ensure they're registered with celery_app
 # Tasks use @celery_app.task decorator, so they're automatically registered
 from app.workers.tasks import import_products, webhook_test  # noqa: F401
+from app.workers.tasks import webhook_dispatch_async  # noqa: F401
 
 # Task routing by queue - routes tasks to specific queues
 celery_app.conf.task_routes = {
     "app.workers.tasks.import_products": {"queue": "imports"},
     "app.workers.tasks.webhook_test": {"queue": "webhooks"},
+    "app.workers.tasks.webhook_dispatch_async": {"queue": "webhooks"},
 }
 # Set default queue (fallback if routing doesn't match)
 celery_app.conf.task_default_queue = "imports"

@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.db.models.import_job import ImportJob
-from app.db.session import SessionLocal
 from app.services import csv_ingest
 from app.services.progress_tracker import publish_progress
+from app.services.webhook_service import build_import_payload, trigger_webhooks
 from app.storage.file_storage import (
     delete_file_from_redis,
     get_file_from_redis,
@@ -247,6 +247,18 @@ def import_products_task(self, job_id: str, file_path: str):
                 "updated": updated_total,
             },
         )
+
+        # Trigger webhook for import completion
+        try:
+            import_payload = build_import_payload(
+                job_id, total_rows, processed, inserted_total, updated_total
+            )
+            import_payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+            trigger_webhooks(
+                "import.completed", import_payload, session, async_dispatch=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to trigger webhook for import completion: {e}")
     except MemoryError as exc:
         # Special handling for memory errors
         session.rollback()

@@ -17,6 +17,7 @@ from app.api.schemas.product import (
     ProductUpdate,
 )
 from app.db.models.product import Product
+from app.services.webhook_service import build_product_payload, trigger_webhooks
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,16 @@ async def create_product(
             db.commit()
             db.refresh(existing)
             logger.info(f"Restored soft-deleted product with SKU {payload.sku}")
+
+            # Trigger webhook for product update (restored product)
+            try:
+                webhook_payload = build_product_payload(existing, "product.updated")
+                trigger_webhooks(
+                    "product.updated", webhook_payload, db, async_dispatch=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to trigger webhook for restored product: {e}")
+
             return ProductRead.model_validate(existing)
 
         # Create new product
@@ -167,6 +178,16 @@ async def create_product(
         db.refresh(product)
 
         logger.info(f"Created product {product.id} with SKU {payload.sku}")
+
+        # Trigger webhook for product creation
+        try:
+            webhook_payload = build_product_payload(product, "product.created")
+            trigger_webhooks(
+                "product.created", webhook_payload, db, async_dispatch=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to trigger webhook for product creation: {e}")
+
         return ProductRead.model_validate(product)
 
     except HTTPException:
@@ -240,6 +261,16 @@ async def update_product(
         db.refresh(product)
 
         logger.info(f"Updated product {product_id}")
+
+        # Trigger webhook for product update
+        try:
+            webhook_payload = build_product_payload(product, "product.updated")
+            trigger_webhooks(
+                "product.updated", webhook_payload, db, async_dispatch=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to trigger webhook for product update: {e}")
+
         return ProductRead.model_validate(product)
 
     except HTTPException:
@@ -286,8 +317,19 @@ async def delete_product(
 
         product.is_deleted = True
         db.commit()
+        db.refresh(product)
 
         logger.info(f"Soft deleted product {product_id}")
+
+        # Trigger webhook for product deletion
+        try:
+            webhook_payload = build_product_payload(product, "product.deleted")
+            trigger_webhooks(
+                "product.deleted", webhook_payload, db, async_dispatch=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to trigger webhook for product deletion: {e}")
+
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     except HTTPException:
