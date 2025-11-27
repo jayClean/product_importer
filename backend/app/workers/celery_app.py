@@ -93,6 +93,7 @@ celery_app.conf.task_routes = {
 celery_app.conf.task_default_queue = "imports"
 
 # Performance and reliability settings
+# Optimized for low-memory environments (Railway free tier)
 celery_config = {
     "task_serializer": "json",
     "accept_content": ["json"],
@@ -109,6 +110,12 @@ celery_config = {
     # Suppress superuser warnings for containerized environments
     "worker_disable_rate_limits": False,
     "worker_hijack_root_logger": False,
+    # Memory optimization settings
+    "worker_max_memory_per_child": 200000,  # 200MB per child (solo pool doesn't use this, but good to set)
+    "result_backend_always_retry": True,
+    "result_backend_max_retries": 3,
+    # Reduce memory usage
+    "task_ignore_result": False,  # Keep results but expire quickly
 }
 
 # Add SSL config to main config if not already set

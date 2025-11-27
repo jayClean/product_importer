@@ -35,16 +35,21 @@ trap cleanup SIGTERM SIGINT
 # Use solo pool for Railway (simpler, less resource intensive, no fork issues)
 # --without-mingle and --without-gossip avoid superuser privilege warnings
 # Solo pool is single-threaded, perfect for Railway's resource constraints
+# Reduced log level to warning to save memory
 echo "Starting Celery worker..."
 # Suppress superuser warning using Python's warning filter
 # Railway containers run as root, which is safe in containerized environments
+# Set memory-efficient Python options
+export PYTHONUNBUFFERED=1
+export PYTHONDONTWRITEBYTECODE=1
 PYTHONWARNINGS="ignore::UserWarning:celery.platforms" \
 celery -A app.workers.celery_app.celery_app worker \
-    --loglevel=info \
+    --loglevel=warning \
     --queues=imports,webhooks,celery \
     --pool=solo \
     --without-mingle \
     --without-gossip \
+    --max-tasks-per-child=50 \
     --detach \
     --pidfile=/tmp/celery.pid \
     --logfile=/tmp/celery.log
@@ -81,6 +86,7 @@ else
 fi
 
 # Start FastAPI server (foreground - this keeps the service alive)
+# Use single worker to reduce memory usage
 echo "Starting FastAPI server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --log-level warning
 

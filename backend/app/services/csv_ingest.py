@@ -34,8 +34,9 @@ async def stage_file(upload_file: UploadFile) -> Path:
         raise ValueError(f"Failed to save file: {str(e)}") from e
 
 
-# Chunk size for CSV processing - processes 5000 rows at a time for optimal performance
-CSV_CHUNK_SIZE = 5000
+# Chunk size for CSV processing - reduced to 1000 rows for lower memory usage
+# This is optimized for Railway's free tier memory constraints
+CSV_CHUNK_SIZE = 1000
 
 def iter_csv_chunks(file_path: Path, chunk_size: int = CSV_CHUNK_SIZE) -> Iterable[list[dict]]:
     """Yield parsed CSV rows (sku, name, description) in memory-safe batches.
