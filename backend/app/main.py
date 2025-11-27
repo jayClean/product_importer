@@ -18,7 +18,10 @@ def create_app() -> FastAPI:
     # Defaults to localhost for development
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=[
+            settings.cors_origins,
+            "https://product-importer-three.vercel.app/",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
