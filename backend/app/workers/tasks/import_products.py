@@ -9,6 +9,11 @@ from app.db.models.import_job import ImportJob
 from app.db.session import SessionLocal
 from app.services import csv_ingest
 from app.services.progress_tracker import publish_progress
+from app.storage.file_storage import (
+    delete_file_from_redis,
+    get_file_from_redis,
+    save_file_to_temp,
+)
 from app.utils.memory_monitor import (
     check_memory_exceeded,
     force_gc,
@@ -20,18 +25,52 @@ from app.workers.celery_app import celery_app
 @celery_app.task(bind=True, name="app.workers.tasks.import_products")
 def import_products_task(self, job_id: str, file_path: str):
     """Process CSV chunks, upsert rows, and update progress tracker."""
+    import logging
+
+    logger = logging.getLogger(__name__)
     session = SessionLocal()
     job: ImportJob | None = session.get(ImportJob, job_id)
     if not job:
         session.close()
         return
 
-    # Resolve to absolute path to ensure consistency across processes
-    path_obj = Path(file_path).resolve()
-    if not path_obj.exists():
-        raise FileNotFoundError(
-            f"CSV file not found: {path_obj}. Current working directory: {Path.cwd()}"
-        )
+    # Handle file retrieval for separate instances
+    # Check if file is stored in Redis (for separate instance deployments)
+    temp_file_path: Path | None = None
+    path_obj: Path | None = None
+
+    if file_path.startswith("redis:") or job.uploaded_file_path.startswith("redis:"):
+        # File is in Redis, retrieve it
+        logger.info(f"Retrieving file from Redis for job {job_id}")
+        file_content = get_file_from_redis(job_id)
+        if not file_content:
+            raise FileNotFoundError(
+                f"File not found in Redis for job {job_id}. "
+                "File may have expired or Redis storage failed."
+            )
+        # Save to temporary local file for processing
+        temp_file_path = save_file_to_temp(file_content, job_id, "upload.csv")
+        path_obj = temp_file_path
+        logger.info(f"Saved file from Redis to temporary location: {path_obj}")
+    else:
+        # File is on local filesystem (same instance deployment)
+        path_obj = Path(file_path).resolve()
+        if not path_obj.exists():
+            # Try to get from Redis as fallback
+            logger.warning(
+                f"Local file not found: {path_obj}, trying Redis fallback for job {job_id}"
+            )
+            file_content = get_file_from_redis(job_id)
+            if file_content:
+                temp_file_path = save_file_to_temp(file_content, job_id, "upload.csv")
+                path_obj = temp_file_path
+                logger.info(f"Retrieved file from Redis fallback: {path_obj}")
+            else:
+                raise FileNotFoundError(
+                    f"CSV file not found: {path_obj}. "
+                    f"Current working directory: {Path.cwd()}. "
+                    f"Also checked Redis for job {job_id} but not found."
+                )
     processed = 0
     inserted_total = 0
     updated_total = 0
@@ -40,7 +79,7 @@ def import_products_task(self, job_id: str, file_path: str):
     try:
         # Log initial memory status
         log_memory_status("Task start")
-        
+
         job.status = "running"
         job.started_at = datetime.now(timezone.utc)
         session.commit()
@@ -48,7 +87,7 @@ def import_products_task(self, job_id: str, file_path: str):
         total_rows = csv_ingest.count_rows(path_obj)
         job.total_rows = total_rows
         session.commit()
-        
+
         log_memory_status(f"After counting {total_rows} rows")
 
         chunk_count = 0
@@ -62,7 +101,7 @@ def import_products_task(self, job_id: str, file_path: str):
                 )
                 logger.error(error_msg)
                 raise MemoryError(error_msg)
-            
+
             # Process chunk
             stats = csv_ingest.upsert_products(chunk, session)
             inserted_total += stats["inserted"]
@@ -70,9 +109,9 @@ def import_products_task(self, job_id: str, file_path: str):
             processed += len(chunk)
             job.processed_rows = processed
             session.commit()
-            
+
             chunk_count += 1
-            
+
             # Force garbage collection every 5 chunks to prevent memory buildup
             if chunk_count % 5 == 0:
                 force_gc()
@@ -95,7 +134,7 @@ def import_products_task(self, job_id: str, file_path: str):
         job.status = "completed"
         job.finished_at = datetime.now(timezone.utc)
         session.commit()
-        
+
         # Final garbage collection and memory log
         force_gc()
         log_memory_status("Task complete")
@@ -119,7 +158,7 @@ def import_products_task(self, job_id: str, file_path: str):
         job.error_message = f"Out of memory: {str(exc)}"
         job.finished_at = datetime.now(timezone.utc)
         session.commit()
-        
+
         log_memory_status("Task failed (OOM)")
         force_gc()  # Try to free memory before failing
 
@@ -145,7 +184,7 @@ def import_products_task(self, job_id: str, file_path: str):
         job.error_message = str(exc)
         job.finished_at = datetime.now(timezone.utc)
         session.commit()
-        
+
         log_memory_status("Task failed")
         force_gc()
 
@@ -165,4 +204,18 @@ def import_products_task(self, job_id: str, file_path: str):
         )
         raise
     finally:
+        # Cleanup: delete temporary file and Redis entry
+        if temp_file_path and temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+                logger.info(f"Cleaned up temporary file: {temp_file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file: {e}")
+
+        # Delete from Redis if it was stored there
+        try:
+            delete_file_from_redis(job_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete file from Redis: {e}")
+
         session.close()
