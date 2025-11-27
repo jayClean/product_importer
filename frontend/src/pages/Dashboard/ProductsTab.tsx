@@ -110,7 +110,7 @@ export const ProductsTab = () => {
           <ProductTable
             products={data.items || []}
             onEdit={handleEdit}
-            onDelete={(id) => {
+            onDelete={() => {
               queryClient.invalidateQueries({ queryKey: ['products'] });
               setToasts([{ id: Date.now(), message: 'Product deleted', type: 'success' }]);
             }}
